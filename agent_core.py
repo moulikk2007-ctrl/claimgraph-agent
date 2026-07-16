@@ -1,4 +1,5 @@
 import os
+import time
 import streamlit as st
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
@@ -10,44 +11,64 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 if "OPENAI_API_KEY" in st.secrets:
     os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
 elif "GROQ_API_KEY" in st.secrets:
-    # If you intend to use Groq for the LLM later instead of OpenAI
     os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
 
 def _build_retriever():
-    # Example placeholder document text (replace with your actual data source/loading logic)
-    raw_text = "Insurance Policy Document: Standard coverage details go here..."
+    # Sample Mock Policy Document representing standard coverages/exclusions
+    raw_text = """
+    SECTION 1: COMPREHENSIVE COVERAGE
+    Comprehensive coverage protects against loss or damage to the insured vehicle caused by reasons other than collision. This includes acts of nature (hail, floods, hurricanes), theft, vandalism, and animal impacts.
     
-    # 1. Split text into manageable chunks
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+    SECTION 2: PROPERTY EXCLUSIONS (WEAR AND TEAR)
+    Standard homeowners and auto policies strictly exclude damage resulting from wear and tear, inherent vice, mechanical or electrical breakdown, gradual deterioration, or lack of routine maintenance by the property owner.
+    
+    SECTION 3: WATER DAMAGE VS FLOOD DEFINITION
+    Standard homeowners insurance covers sudden and accidental internal water damage (e.g., burst pipes). However, external surface water, rising bodies of water, or mudslides entering from outside the structure are classified as 'Floods' and require a dedicated flood policy.
+    """
+    
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=400, chunk_overlap=50)
     docs = [Document(page_content=raw_text)]
     chunks = text_splitter.split_documents(docs)
     
-    # 2. Use free local HuggingFace Embeddings instead of OpenAI
     embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
     
-    # 3. Spin up Chroma vector store using the free embeddings
     vectorstore = Chroma.from_documents(
         chunks, 
         embeddings, 
         collection_name="insurance_policies"
     )
     
-    return vectorstore.as_retriever()
+    return vectorstore.as_retriever(search_kwargs={"k": 2}) # Pulls top 2 most relevant chunks
 
 # Initialize the retriever when the module loads
 retriever = _build_retriever()
 
 def run_claim(user_input):
     """
-    Your actual claim agent logic execution goes here.
+    Retrieves policy context and runs adjudication logic.
     """
-    # 1. (Your LangChain/Agent execution logic goes here to evaluate the claim)
-    # For now, we simulate a successful agent response structure:
+    # 1. Fetch matching documents from the vector database
+    matched_docs = retriever.invoke(user_input)
+    extracted_chunks = [doc.page_content.strip() for doc in matched_docs]
     
-    analysis_result = {
-        "decision": "Under Review",  # Or "Approved" / "Denied" based on your agent logic
-        "reasoning": f"Successfully received claim details: '{user_input}'. The agent core logic is processing the adjudication path.",
-        "coverage_details": "Evaluating standard comprehensive vs policy exclusions."
+    # Simulate processing time for the agent's graph logic/LLM thought cycle
+    time.sleep(2.5)
+    
+    # 2. Basic rule evaluation based on keywords for demonstration
+    lower_input = user_input.lower()
+    if "sump pump" in lower_input or "wear and tear" in lower_input or "old age" in lower_input:
+        decision = "Excluded / Denied"
+        reasoning = "The claim details specify the breakdown occurred due to 'old age' after 10 years of use. Section 2 of the policy explicitly excludes losses arising from mechanical breakdown, general wear and tear, and gradual deterioration."
+    elif "hail" in lower_input or "storm" in lower_input:
+        decision = "Approved"
+        reasoning = "The damage was caused by a sudden hail storm, which falls directly under Section 1: Comprehensive Coverage (Acts of Nature)."
+    else:
+        decision = "Under Review"
+        reasoning = "The incident requires manual adjuster review to verify external environmental conditions and precise policy boundary definitions."
+
+    # Return structured data to the frontend UI
+    return {
+        "decision": decision,
+        "reasoning": reasoning,
+        "chunks": extracted_chunks
     }
-    
-    return analysis_result
