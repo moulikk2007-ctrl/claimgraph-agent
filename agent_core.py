@@ -32,10 +32,11 @@ def _build_retriever():
     
     embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
     
+    # Using a fresh collection name forces Chroma to ignore the old cached placeholder text
     vectorstore = Chroma.from_documents(
         chunks, 
         embeddings, 
-        collection_name="insurance_policies"
+        collection_name="insurance_policies_v2"
     )
     
     return vectorstore.as_retriever(search_kwargs={"k": 2}) # Pulls top 2 most relevant chunks
