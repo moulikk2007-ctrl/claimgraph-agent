@@ -1,6 +1,5 @@
-streamlit
-langgraph
 langchain
+langchain-community
 langchain-openai
 langchain-chroma
-chromadb
+streamlit
